@@ -155,6 +155,13 @@ node website-summarizer.js --url=https://example.com --output=./output --length=
 - レート制限により処理が一時停止する場合があります
 - 一部のウェブサイトはアクセス制限がある場合があります
 
+## voicevoxのdocker imageを使いたい時
+
+```sh
+docker pull voicevox/voicevox_engine:cpu-latest
+docker run --rm -p '127.0.0.1:50021:50021' voicevox/voicevox_engine:cpu-latest
+```
+
 ## ライセンス
 
 ISC License
