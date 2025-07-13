@@ -83,8 +83,14 @@ async function main() {
       const urls = config.websites.urls;
       const results = await processUrls(urls, outputDir, summaryLength);
       
+      // 日付ディレクトリの作成
+      const today = new Date();
+      const dateStr = today.getFullYear() + '-' + 
+                     String(today.getMonth() + 1).padStart(2, '0') + '-' + 
+                     String(today.getDate()).padStart(2, '0');
+      
       // 全体の結果をまとめたレポートを作成
-      const allSummariesDir = path.join(outputDir, 'all_summaries');
+      const allSummariesDir = path.join(outputDir, dateStr, 'all_summaries');
       if (!fs.existsSync(allSummariesDir)) {
         fs.mkdirSync(allSummariesDir, { recursive: true });
       }
@@ -108,7 +114,7 @@ ${results.map(result => `### ${result.url}\n\n${result.summary}\n\n[詳細レポ
       
       console.log('\n✅ すべてのURLの処理が完了しました');
       console.log(`📄 全体レポート: ${reportPath}`);
-      console.log(`📁 各URLの詳細レポートは ${outputDir} 内の各サブディレクトリにあります`);
+      console.log(`📁 各URLの詳細レポートは ${outputDir}/${dateStr} 内の各サブディレクトリにあります`);
       
       console.log('\n使用方法:');
       console.log('  設定ファイルから複数URLを処理: node website-summarizer.js --config');
