@@ -114,7 +114,7 @@ async function handleSingleFile(filePath, voicevoxAPI, audioPlayer, configManage
   
   const fileContent = FileUtils.readTextFile(filePath);
   if (!fileContent) {
-    return;
+    return null;
   }
   
   console.log('ファイルの内容を読み上げます...');
@@ -123,6 +123,23 @@ async function handleSingleFile(filePath, voicevoxAPI, audioPlayer, configManage
   
   const audioFilePath = await voicevoxAPI.textToSpeech(fileContent, speakerId, outputFile);
   await audioPlayer.playIfEnabled(audioFilePath);
+  
+  return audioFilePath;
+}
+
+/**
+ * 単一ファイルの音声ファイルを生成する（再生なし）
+ */
+async function generateSingleFileAudio(filePath, voicevoxAPI, configManager, outputFileName) {
+  const fileContent = FileUtils.readTextFile(filePath);
+  if (!fileContent) {
+    return null;
+  }
+  
+  const speakerId = configManager.get('speaker.default_id');
+  const audioFilePath = await voicevoxAPI.generateAudioFile(fileContent, speakerId, outputFileName);
+  
+  return audioFilePath;
 }
 
 /**
@@ -167,24 +184,40 @@ async function handleDirectory(dirPath, voicevoxAPI, audioPlayer, configManager)
     // ファイル名でソート
     textFiles.sort();
     
-    console.log(`${textFiles.length}個のファイルが見つかりました。順番に読み上げます...`);
+    console.log(`${textFiles.length}個のファイルが見つかりました。音声ファイルを作成します...`);
+    
+    // フェーズ1: すべての音声ファイルを生成
+    const audioFilePaths = [];
     
     for (let i = 0; i < textFiles.length; i++) {
       const fileName = textFiles[i];
       const filePath = path.join(dirPath, fileName);
+      const outputFileName = `${path.basename(fileName, path.extname(fileName))}_${i + 1}.wav`;
       
-      console.log(`\n[${i + 1}/${textFiles.length}] ${fileName} を読み上げています...`);
+      console.log(`\n[${i + 1}/${textFiles.length}] ${fileName} の音声ファイルを生成中...`);
       
-      await handleSingleFile(filePath, voicevoxAPI, audioPlayer, configManager);
-      
-      // 最後のファイル以外の場合は少し待機
-      if (i < textFiles.length - 1) {
-        console.log('次のファイルに進みます...\n');
-        await new Promise(resolve => setTimeout(resolve, 1000));
+      try {
+        const audioFilePath = await generateSingleFileAudio(filePath, voicevoxAPI, configManager, outputFileName);
+        if (audioFilePath) {
+          audioFilePaths.push(audioFilePath);
+          console.log(`音声ファイルを生成しました: ${path.basename(audioFilePath)}`);
+        }
+      } catch (error) {
+        console.error(`${fileName} の音声生成中にエラーが発生しました:`, error);
+        // エラーが発生しても次のファイルに進む
+        continue;
       }
     }
     
-    console.log('\nすべてのファイルの読み上げが完了しました。');
+    if (audioFilePaths.length === 0) {
+      console.log('音声ファイルが生成されませんでした。');
+      return;
+    }
+    
+    console.log(`\n=== ${audioFilePaths.length}個の音声ファイルが生成されました ===`);
+    
+    // フェーズ2: すべての音声ファイルを順番に再生
+    await audioPlayer.playMultipleFiles(audioFilePaths);
     
   } catch (error) {
     console.error('ディレクトリの読み込み中にエラーが発生しました:', error);

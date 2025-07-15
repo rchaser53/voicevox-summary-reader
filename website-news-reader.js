@@ -1,7 +1,10 @@
 const path = require('path');
+const fs = require('fs');
 const ConfigManager = require('./lib/config-manager');
+const VoicevoxAPI = require('./lib/voicevox-api');
+const AudioPlayer = require('./lib/audio-player');
+const FileUtils = require('./lib/file-utils');
 const { processUrls } = require('./lib/website-summarizer-core');
-const { callVoicevoxAPI } = require('./index');
 
 // 設定ファイルのパス
 const CONFIG_FILE = path.join(__dirname, 'config.json');
@@ -52,30 +55,119 @@ async function main() {
       return;
     }
     
-    // 読み上げ用ディレクトリのパスを収集
-    const readingDirs = results.map(result => result.outputDir);
-    
     console.log('\n=== 要約が完了しました ===');
     console.log(`${results.length}個のウェブサイトが処理されました。`);
     
-    // 各ディレクトリを順番に読み上げ
-    for (let i = 0; i < readingDirs.length; i++) {
-      const dir = readingDirs[i];
-      console.log(`\n[${i + 1}/${readingDirs.length}] ${dir} の読み上げを開始します...`);
-      
-      // index.jsのディレクトリ処理機能を使用して読み上げ
-      await callVoicevoxAPI(dir);
-      
-      // 最後のディレクトリ以外の場合は少し待機
-      if (i < readingDirs.length - 1) {
-        console.log('次のウェブサイトに進みます...\n');
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-    }
+    // 音声読み上げを実行
+    await generateAndPlayAllAudio(results, configManager);
     
     console.log('\nすべてのウェブサイト要約の読み上げが完了しました。');
   } catch (error) {
     console.error('予期せぬエラーが発生しました:', error);
+  }
+}
+
+/**
+ * 全ての音声ファイルを生成してから順番に再生する
+ */
+async function generateAndPlayAllAudio(results, configManager) {
+  try {
+    // VoicevoxAPIとAudioPlayerを初期化
+    const voicevoxAPI = new VoicevoxAPI(configManager);
+    const audioPlayer = new AudioPlayer(configManager);
+    
+    console.log('\n=== フェーズ1: 全ての音声ファイルを生成します ===');
+    
+    const allAudioFiles = [];
+    let totalFiles = 0;
+    
+    // 各ディレクトリ内のファイル数を計算
+    for (const result of results) {
+      const files = getTextFilesInDirectory(result.outputDir);
+      totalFiles += files.length;
+    }
+    
+    console.log(`合計 ${totalFiles} 個の音声ファイルを生成します...\n`);
+    
+    let currentFileIndex = 0;
+    
+    // 各ディレクトリを処理
+    for (let dirIndex = 0; dirIndex < results.length; dirIndex++) {
+      const result = results[dirIndex];
+      const dirPath = result.outputDir;
+      
+      console.log(`\n[ディレクトリ ${dirIndex + 1}/${results.length}] ${path.basename(dirPath)} の音声ファイルを生成中...`);
+      
+      const textFiles = getTextFilesInDirectory(dirPath);
+      const speakerId = configManager.get('speaker.default_id');
+      
+      for (let fileIndex = 0; fileIndex < textFiles.length; fileIndex++) {
+        const fileName = textFiles[fileIndex];
+        const filePath = path.join(dirPath, fileName);
+        const outputFileName = `website_${dirIndex + 1}_${fileIndex + 1}.wav`;
+        
+        currentFileIndex++;
+        console.log(`[${currentFileIndex}/${totalFiles}] ${fileName} の音声ファイルを生成中...`);
+        
+        try {
+          const fileContent = FileUtils.readTextFile(filePath);
+          if (fileContent) {
+            const audioFilePath = await voicevoxAPI.generateAudioFile(fileContent, speakerId, outputFileName);
+            if (audioFilePath) {
+              allAudioFiles.push({
+                path: audioFilePath,
+                fileName: fileName,
+                dirName: path.basename(dirPath)
+              });
+              console.log(`✅ 音声ファイルを生成しました: ${path.basename(audioFilePath)}`);
+            }
+          }
+        } catch (error) {
+          console.error(`❌ ${fileName} の音声生成中にエラーが発生しました:`, error);
+          // エラーが発生しても次のファイルに進む
+          continue;
+        }
+      }
+    }
+    
+    if (allAudioFiles.length === 0) {
+      console.log('音声ファイルが生成されませんでした。');
+      return;
+    }
+    
+    console.log(`\n=== ${allAudioFiles.length}個の音声ファイルが生成されました ===`);
+    
+    // フェーズ2: すべての音声ファイルを順番に再生
+    console.log('\n=== フェーズ2: 音声ファイルの再生を開始します ===');
+    
+    const audioPaths = allAudioFiles.map(audio => audio.path);
+    await audioPlayer.playMultipleFiles(audioPaths);
+    
+  } catch (error) {
+    console.error('音声ファイルの生成・再生中にエラーが発生しました:', error);
+  }
+}
+
+/**
+ * ディレクトリ内のテキストファイル一覧を取得
+ */
+function getTextFilesInDirectory(dirPath) {
+  try {
+    const files = fs.readdirSync(dirPath);
+    
+    return files.filter(file => {
+      const filePath = path.join(dirPath, file);
+      const stats = fs.statSync(filePath);
+      
+      if (!stats.isFile()) return false;
+      
+      const ext = path.extname(file).toLowerCase();
+      return ['.txt', '.md', '.json', '.js', '.ts', '.html', '.css', '.xml', '.csv'].includes(ext);
+    }).sort();
+    
+  } catch (error) {
+    console.error(`ディレクトリ ${dirPath} の読み込み中にエラーが発生しました:`, error);
+    return [];
   }
 }
 
