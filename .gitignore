@@ -4,5 +4,5 @@ website_summaries
 node_modules
 
 news_output/*
-
 !.gitkeep
+dist
