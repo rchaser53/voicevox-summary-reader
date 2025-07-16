@@ -1,24 +1,47 @@
 {
   "name": "voicevox-summary-reader",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "npm run clean && tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "dev:read-all": "ts-node src/read-all.ts",
+    "dev:news": "ts-node src/news-reader.ts",
+    "dev:website": "ts-node src/website-news-reader.ts",
+    "dev:fetcher": "ts-node src/news-fetcher.ts",
+    "dev:summarizer": "ts-node src/website-summarizer.ts",
+    "start:read-all": "node dist/read-all.js",
+    "start:news": "node dist/news-reader.js",
+    "start:website": "node dist/website-news-reader.js",
+    "start:fetcher": "node dist/news-fetcher.js",
+    "start:summarizer": "node dist/website-summarizer.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "clean": "rm -rf dist"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@langchain/core": "^0.1.17",
+    "@langchain/openai": "^0.0.14",
     "axios": "^1.9.0",
+    "dotenv": "^16.4.5",
+    "langchain": "^0.1.25",
+    "minimatch": "^9.0.3",
     "node-fetch": "^3.3.2",
     "play-sound": "^1.1.6",
     "readline-sync": "^1.4.10",
-    "rss-parser": "^3.13.0",
-    "@langchain/openai": "^0.0.14",
-    "@langchain/core": "^0.1.17",
-    "langchain": "^0.1.25",
-    "dotenv": "^16.4.5",
-    "minimatch": "^9.0.3"
+    "rss-parser": "^3.13.0"
+  },
+  "devDependencies": {
+    "@types/dotenv": "^6.1.1",
+    "@types/minimatch": "^5.1.2",
+    "@types/node": "^24.0.14",
+    "@types/play-sound": "^1.1.2",
+    "@types/readline-sync": "^1.4.8",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
   }
 }
